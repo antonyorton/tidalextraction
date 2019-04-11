@@ -1,11 +1,11 @@
 # Tidalextraction
 Modules to deal with extraction of tidal signals from groundwater levels or to extract desired frequencies from a pure tide
 
-##Purpose
+## Purpose
 To enable filtering of tidal frequencies from groundwater level data
 To enable tidal prediction from previous tidal observations
 
-#Included
+# Included
 BrisbaneBar2016.csv and BrisbaneBar2017.csv are sample tidal data from https://www.msq.qld.gov.au/Tides/Open-data
 The first file can be used to extract freqiencies and the second to test prediction
 
