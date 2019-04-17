@@ -8,11 +8,8 @@ import  matplotlib.pyplot as plt
     
     Can be used to predict tide """
 
-num_constits = 3
-
-data = import_tide_csv_qldopendata('BrisbaneBar_2016.csv')  #import tide data from csv file (specific format for this function)
-constitfreq = import_tide_constituents()  #tidal constituent frequencies
-
+    #NOTE not working exactly: leaves a random global phase shift for some reason
+    #Better to use optimisetides.py
 
 def extract_amplitudes_and_phase(data, constitfreq, num_constits = 7):
 
@@ -146,36 +143,42 @@ def dft_to_remove_high_freq(filename = 'my_file.csv',max_freq_hz = 1/50/60/60, t
     
     return
     
-    
-    
 
-#Test - recreate cosine waves
-amplitudes = result['amplitudes'].values
-phases = result['phases'].values
-freqs=result['freqs'].values 
-T = data[:,0]
-H = data[:,1]   
+if __name__ == "__main__":
+    num_constits = 3
 
-#Test on input data
-func = np.zeros(len(T)) + amplitudes[0]
-for i in range(1,len(amplitudes)):
-    func+=amplitudes[i]*np.cos(phases[i]-2*np.pi*freqs[i]*T-np.pi/2)
+    data = import_tide_csv_qldopendata('BrisbaneBar_2016.csv')  #import tide data from csv file (specific format for this function)
+    constitfreq = import_tide_constituents()  #tidal constituent frequencies
 
-plt.plot(T,H,'r',T,func,'g')
-plt.show()
-plt.plot(T,H,'r',T,H-func,'g')
-plt.show()
-    
-    
-#predict on future year data
-data2=import_tide_csv_qldopendata('BrisbaneBar_2017.csv')
-Tnew = data2[:,0]
-Hnew = data2[:,1]
+    result = extract_amplitudes_and_phase(data, constitfreq, num_constits = num_constits)
 
-func = np.zeros(len(Tnew)) + amplitudes[0]
-for i in range(1,len(amplitudes)):
-    func+=amplitudes[i]*np.cos(phases[i]-2*np.pi*freqs[i]*Tnew-np.pi/2)
-    
-plt.plot(Tnew,Hnew,'r',Tnew,func,'g')
-plt.show()
+    #Test - recreate cosine waves
+    amplitudes = result['amplitudes'].values
+    phases = result['phases'].values
+    freqs=result['freqs'].values 
+    T = data[:,0]
+    H = data[:,1]   
+
+    #Test on input data
+    func = np.zeros(len(T)) + amplitudes[0]
+    for i in range(1,len(amplitudes)):
+        func+=amplitudes[i]*np.cos(phases[i]-2*np.pi*freqs[i]*T-np.pi/2)
+
+    plt.plot(T,H,'r',T,func,'g')
+    plt.show()
+    plt.plot(T,H,'r',T,H-func,'g')
+    plt.show()
+        
+        
+    #predict on future year data
+    data2=import_tide_csv_qldopendata('BrisbaneBar_2017.csv')
+    Tnew = data2[:,0]
+    Hnew = data2[:,1]
+
+    func = np.zeros(len(Tnew)) + amplitudes[0]
+    for i in range(1,len(amplitudes)):
+        func+=amplitudes[i]*np.cos(phases[i]-2*np.pi*freqs[i]*Tnew-np.pi/2)
+        
+    plt.plot(Tnew,Hnew,'r',Tnew,func,'g')
+    plt.show()
 
