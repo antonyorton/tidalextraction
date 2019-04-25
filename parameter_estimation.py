@@ -18,14 +18,14 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
         
         filename: Name of csv file: first column is Time (column header 'Time'). The other columns have obs. well name
                  as their header and the groundwater response as the data (rows)
-                 Supports any number of observation wells refereing to the same time data from column 1.
+                 Supports any number of observation wells refering to the same time data from column 1.
         wellname: The name of the pumping/recharge test well
         flow_rate: Rate of puming/recharge into the test well
         start_stop: list/array with 0 entry = start of puming and 1 entry = end of pumping time.
         dist_matrix: Name of a csv file: the first column contains the names for all the observation wells. 
                      The remaining columns are named after (ie column header name) each test well. 
                      The data is the distance between the obs. well named in the first column and the test 
-                     well named in the first rows.
+                     well named in the first row.
         imagewell_dist_matrix: Name of csv file: same data format as above for the distance matrix except 
                     that now the data is the distance from the observation well to the image well 
                     (ie for no flow bdry conditions). Column header must have the same name as the test well.
@@ -128,8 +128,8 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
         ttt = time.time()
         #Optimise leaky Walton well function
         allvals = data.values[:,1::]
-        allvals=allvals[0::]  #shorten the set
-        tnew=t[0::]           #shorten the set
+        allvals=allvals[0::]  #shorten the set (modify here if taking too long)
+        tnew=t[0::]           #shorten the set (modify here if taking too long)
         list1 = []
         for i in range(allvals.shape[-1]):
             vals = allvals[:,i]
