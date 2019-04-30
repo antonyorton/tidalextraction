@@ -135,9 +135,9 @@ def optimise_tides3freq(t,vals,print_result=False):
 
 	return (tidefunction,popt)
   
-def optimise_tides3freq(t,vals,print_result=False):
+def optimise_tides2freq(t,vals,print_result=False):
     
-	"""t in hours, 3 frequencies extracted
+	"""t in hours, 2 frequencies extracted
 	
 		returns (tidefunction, popt)
 			which may be called by valsnew = tidefuction(tnew,*popt)"""

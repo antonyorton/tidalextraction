@@ -1,16 +1,16 @@
-
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.integrate import quad
+from scipy.integrate import quad, fixed_quad
 from scipy.special import exp1
 import scipy.optimize as opt
 import time
 import os
 
 
-def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matrix = 'distances.csv', imagewell_dist_matrix = 'imagewell_distances.csv', fit_leaky = True,plot_results = True, results_to_csv = False):
+def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
+    dist_matrix = 'distances.csv', imagewell_dist_matrix = 'imagewell_distances.csv', \
+    include_image_well=False,fit_leaky = True,points_for_fit = 50,plot_results = True, results_to_csv = False):
     
     """Curve fitting of groundwater pumping test data to both the Theis W(u) function and the Walton W(u,R/L) function
     
@@ -40,8 +40,6 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
     """
    
     
-    
-    
     print("Time units (sec, min, hr or day) and distance units (m, cm and mm) are the responsibility of the user. Displayed results will be in those same units.")
     print("The user is responsible for supplying consistent units")
     
@@ -51,10 +49,10 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
     
     #import data
     data=pd.read_csv(filename)
-    #data=data.iloc[0:int(use_percentage_of_data*len(data))].copy() #slightly trimmed to not include recovery period
 
+    
     #crop data prior to test start time
-    t=data.values[:,0]
+    t=data.values[:,0]  
     startindex = np.argmax(t>=starttest)
     data=data.iloc[startindex::].copy()
     data.reset_index(inplace=True,drop=True)
@@ -62,10 +60,7 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
     endindex = np.argmax(t>=endtest)
 
     ###################
-
-    fittedtheis = pd.DataFrame(t,columns=['Time']) #DF to store theis curves
-    fittedleaky = pd.DataFrame(t,columns=['Time'])
-
+      
     #time since start of test
     t=t-t[0]
     
@@ -73,6 +68,16 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
     trecov = t[::]-t[endindex]
     trecov[0:endindex]=0
 
+    #shorten the set creates tnew and trecovnew to be used in all leaky analysis from here on
+    if points_for_fit<len(t):
+        ind1 = reduced_indicies(len(t),max_n=points_for_fit,stop_pumping_index=endindex)  
+        t=t[ind1]
+        trecov=trecov[ind1]        
+    else:
+        ind1 = np.arange(len(t))
+        
+    fittedtheis = pd.DataFrame(t,columns=['Time']) #DF to store theis curves
+    
     #radial distances
     distance_matrix = pd.read_csv(dist_matrix,index_col=0)
     if include_image_well==True:
@@ -80,7 +85,7 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
 
 
     #Optimise standard Theis
-    allvals = data.values[:,1::]
+    allvals = data.values[:,1::][ind1]
     list1 = []
 
     for i in range(allvals.shape[-1]):
@@ -103,6 +108,7 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
 
         print(i)
         vals = allvals[:,i]
+
         try:
             popt, pcov = opt.curve_fit(func,t,vals,bounds=([0,1e-6],[1000,1e-1]))#,maxfev=40000)
         except RuntimeError:
@@ -114,7 +120,10 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
     resulttheis = pd.DataFrame(list1,columns=['name','1std_dev','T','S','R_dist'])
     print(resulttheis)
     ##END Optimise standard Theis
-                
+        
+
+
+    
     ###Leaky aquifer
     if fit_leaky:    
         ## Walton leakage integrand for W(u,a) where a=r/L
@@ -127,13 +136,16 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
 
         ttt = time.time()
         #Optimise leaky Walton well function
-        allvals = data.values[:,1::]
-        allvals=allvals[0::]  #shorten the set (modify here if taking too long)
-        tnew=t[0::]           #shorten the set (modify here if taking too long)
+        allvals = data.values[:,1::][ind1]
+        
+        
+        fittedleaky = pd.DataFrame(t,columns=['Time'])
+        
         list1 = []
         for i in range(allvals.shape[-1]):
             vals = allvals[:,i]
 
+            
             #get R#############
             R = distance_matrix.loc[list(data)[i+1]][wellname]
             if include_image_well:
@@ -142,6 +154,7 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
                 Rimage = 0
             ####################
 
+            ###NEEDS TO BE FIXED UP: trecov AND t should be passed to function, not just t
             #############################
             ##optimisable Walton leakage function for T,N,R,a=R/L  where T is transmissivity, N wells all at distance R from monitoring wells
             def funcwalton(t,T,S,L):
@@ -152,7 +165,7 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
             ##############################
             
             try:
-                popt, pcov = opt.curve_fit(funcwalton,tnew,vals,bounds=([0,1e-6,10],[1000,1,10000]))
+                popt, pcov = opt.curve_fit(funcwalton,t,vals,bounds=([0,1e-5,10],[400,0.1,5000]))
             except RuntimeError:
                 print('- Error: curve fit failed')
             list1.append([list(data)[i+1],np.sqrt(np.diag(pcov))[0]]+list(popt)+[R])
@@ -167,15 +180,17 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
 
     if plot_results:
         #plotting - both
+        tfull = data.values[:,0]
         allvals = data.values[:,1::]
         for i in range(len(resulttheis)):
-            plt.plot(t,fittedtheis.values[:,i+1],'b',label='Theis W(u)')
+            #plt.plot(t,fittedtheis.values[:,i+1],'b',label='Theis W(u)')
             if fit_leaky:
-                plt.plot(t,fittedleaky.values[:,i+1],'r',label='Leaky W(u,r/L)')
-            plt.plot(t,allvals[:,i],'k')
+                plt.plot(t+tfull[0],fittedleaky.values[:,i+1],'r',label='Leaky W(u,r/L)')
+            plt.plot(tfull,allvals[:,i],'k')
+            plt.plot(tfull[ind1],allvals[:,i][ind1],'ob',fillstyle='none')
             plt.xlabel('Time (in same units as input file)')
             plt.ylabel('Response (in same units as input file)')
-            plt.title(wellname+' Recharge - obs well: '+resulttheis.iloc[i]['name'])
+            plt.title(wellname+' Recharge - obs well: '+resulttheis.iloc[i]['name']+'  T = '+str(resultleak.iloc[i]['T']))
             plt.legend(loc='lower right')
             plt.grid(True)
             plt.show()   
@@ -192,33 +207,86 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], dist_matri
         return (resulttheis,fittedtheis,resultleak,fittedleaky)
     else:
         return (resulttheis,fittedtheis,[],[])
+
+
+def reduced_indicies(N,max_n=50,stop_pumping_index=100):
+    
+    """ provides a shortened number of sample points (exponentially spaced) for a puming/recovery test
         
+        N: (Int) the current number of sample points
+        nrequired: (Int) The desired number of sample points
+        stop_pumping_index: (Int) The index at which pumping stops and recovery begins
+    
+        returns: index of sample points to use
+    
+    """
+
+    n = stop_pumping_index
+    indicies = []
+    
+    if n>=N:
+        M = max_n
+    else:
+        M = int(max_n/2)
+    
+    
+    #Indexes for pumping part of test
+    R1 = M/np.log(n-1)
+    set1=[]
+    for i in range(M):
+        set1.append(np.exp(i/R1))
+    set1 = np.array(set1)
+    set1-=1
+    
+    #Indexes for recovery part of test
+    if M != max_n:
+        R2 = M/np.log(N-n)
+        set2=[]
+        for i in range(M):
+            set2.append(np.exp(i/R2))
+        set2 = np.array(set2) 
+        set2 = set2-1+n 
+        indicies = np.hstack((set1,set2)).astype(int)
+    else:
+        indicies = set1.astype(int)
+    
+    if indicies[-1] != N-1:
+        indicies[-1] = N-1   #make sure last point is included
+    
+    print('new index of length '+str(len(np.unique(indicies)))+' created.')
+    return np.unique(indicies)
+
+
+    
 if __name__ == "__main__":
     
+    import os
     dir1 = os.getcwd()
     os.chdir('C:\\Users\\A_Orton\\Desktop\\python_codes\\5_Tidalextraction\\groundwaterTestData\\recharge\\data')
     
-    print('0. well 1')
-    print('1. well 2')
-    print('2. well 3')
-    print('3. well 4')
+    print('0. Well1')
+    print('1. Well2')
+    print('2. Well3')
+    print('3. Well4')
     numwell=int(input('Choose well number (0,1,2,3):'))
-    wnames = ['well 2','well 3','well 4','well 5']
+    wnames = ['Well1','Well1','Well1','Well1']
     imwell = [True,True,False,False]
-    flow_rate=[2.0,1.2,0.5,1.7]
+    myflow_rate=[2.0,1.2,0.5,1.7]
     #test start and finish times in order of wells as specified in wnames
-    startstop=[[2,9],[42,67],[12,24],[32,39]]
+    startstop=[[1,5],[1,15],[1,9],[3,14]]
 
     #Well name
-    wellname=wnames[numwell]
-    filename = wnames[numwell]+'_smoothed.csv'
+    mywellname=wnames[numwell]
+    myfilename = wnames[numwell]+'_smoothed.csv'
+    #myfilename = 'Dummy_speedtest.csv'
     include_image_well=imwell[numwell]
-    starttest = startstop[numwell][0]
-    endtest = startstop[numwell][1]
+    start11 = startstop[numwell][0]
+    end11 = startstop[numwell][1]
     
-    Q = flow_rate[numwell]/1000*86400  #Flow rate in m3/day to be consistent with time input column of groundwater response data
+    myQ = myflow_rate[numwell]/1000*86400  #Flow rate in m3/day to be consistent with time input column of groundwater response data
     
-    resulttheis,fittedtheis,resultleak,fittedleaky = fit_params(filename, wellname,flow_rate = Q, start_stop = [starttest,endtest],fit_leaky=True)
+    resulttheis,fittedtheis,resultleak,fitleak = fit_params(myfilename, mywellname,points_for_fit=50,flow_rate = myQ, start_stop = [start11,end11],\
+    include_image_well=include_image_well,fit_leaky=True)
     
     os.chdir(dir1)
     
