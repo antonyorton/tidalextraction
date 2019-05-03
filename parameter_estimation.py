@@ -53,11 +53,11 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
     
     #crop data prior to test start time
     t=data.values[:,0]  
-    startindex = np.argmax(t>=starttest)
+    startindex = np.argmax(t>=starttest-0.05/24)
     data=data.iloc[startindex::].copy()
     data.reset_index(inplace=True,drop=True)
     t=data.values[:,0]
-    endindex = np.argmax(t>=endtest)
+    endindex = np.argmax(t>=endtest-0.05/24)
 
     ###################
       
@@ -260,25 +260,26 @@ def reduced_indicies(N,max_n=50,stop_pumping_index=100):
     
 if __name__ == "__main__":
     
-    import os
-    dir1 = os.getcwd()
-    os.chdir('C:\\Users\\A_Orton\\Desktop\\python_codes\\5_Tidalextraction\\groundwaterTestData\\recharge\\data')
+    #import os
+    #dir1 = os.getcwd()
+    #os.chdir('\\ABTFFS01.corp.coffey.com.au\\Data$\\GEOT\\PROJ\GEOTABTF\200000TT\754-MELGE200000 - Melbourne Metro\DATA\Groundwater\Recharge Tests\Detailed assessment\Arden\data')
     
-    print('0. Well1')
-    print('1. Well2')
-    print('2. Well3')
-    print('3. Well4')
-    numwell=int(input('Choose well number (0,1,2,3):'))
-    wnames = ['Well1','Well1','Well1','Well1']
-    imwell = [True,True,False,False]
-    myflow_rate=[2.0,1.2,0.5,1.7]
+    print('0. d1')
+    print('1. d2')
+    print('2. d3')
+    print('3. d4')
+	print('4. d5')
+	print('5. d6')
+    numwell=int(input('Choose well number (0,1,2,3,4,5):'))
+    wnames = ['a','b','c','d','e','f']
+    imwell = [False,False,False,False,False,False]
+    myflow_rate=[1,1,1,1,1,2,]
     #test start and finish times in order of wells as specified in wnames
-    startstop=[[1,5],[1,15],[1,9],[3,14]]
+    startstop=[[43311.60,43319.69],[43327.63,43330.73],[43347.42,43356.71],[43335.42,43343.69],[43360.56,43370.65],[43374.54,43377.67]]
 
     #Well name
     mywellname=wnames[numwell]
-    myfilename = wnames[numwell]+'_smoothed.csv'
-    #myfilename = 'Dummy_speedtest.csv'
+    myfilename = wnames[numwell]+'.csv'
     include_image_well=imwell[numwell]
     start11 = startstop[numwell][0]
     end11 = startstop[numwell][1]
@@ -288,6 +289,6 @@ if __name__ == "__main__":
     resulttheis,fittedtheis,resultleak,fitleak = fit_params(myfilename, mywellname,points_for_fit=50,flow_rate = myQ, start_stop = [start11,end11],\
     include_image_well=include_image_well,fit_leaky=True)
     
-    os.chdir(dir1)
+    #os.chdir(dir1)
     
     
