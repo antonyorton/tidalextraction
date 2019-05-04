@@ -216,123 +216,121 @@ def fft_keeptidalbands(t,vals,bands = [[0.03,0.06],[0.07,0.1]]):
 
 def smooth_MM_tide(filename):
 	
-	""" 
-	FUNCTION TO SMOOTH TIDALLY INFLUENCED GROUNDWATER
-	filename points to a raw data excel csv file with:
-	 - FIRST column: Excel date  (NOT minutes since start of test)
-	 - OTHER columns: Water levels in wells at the times specified in the first column
-					  with a different well on each column
-	No data values will be filled with next valid value, or previous if there is no next value
-	 - exclude: list noting the columns to be excluded from results
-	
-	OUTPUT: Saves a new csv file with the word 'smoothed' appended to the name
-	"""
+    """ 
+    FUNCTION TO SMOOTH TIDALLY INFLUENCED GROUNDWATER
+    filename points to a raw data excel csv file with:
+     - FIRST column: Excel date  (NOT minutes since start of test)
+     - OTHER columns: Water levels in wells at the times specified in the first column
+                      with a different well on each column
+    No data values will be filled with next valid value, or previous if there is no next value
+     - exclude: list noting the columns to be excluded from results
+
+    OUTPUT: Saves a new csv file with the word 'smoothed' appended to the name
+    """
 
     ###Data preparation
-	
-	data = pd.read_csv(filename)
-	data.dropna(axis=1,how='all',inplace=True)  #drop columns with all NaN
-	data.fillna(method='bfill',inplace=True) #fill other NaN
-	data.fillna(method='ffill',inplace=True)
 
-	print("Excel date input DD-MM-YY HH:MM must be column 1 of input csv file")
-	print("Ensure day is first, not month")
-	###deal with excel date input (EXCEL DATE INPUT IS ASSUMED)
-	###convert to numeric days
+    data = pd.read_csv(filename)
+    data.dropna(axis=1,how='all',inplace=True)  #drop columns with all NaN
+    data.fillna(method='bfill',inplace=True) #fill other NaN
+    data.fillna(method='ffill',inplace=True)
 
-
-	col_1_name = list(data)[0]
-	data[col_1_name] = pd.to_datetime(data[col_1_name],dayfirst=True)
-	data[col_1_name] = pd.to_numeric(data[col_1_name])/1e9/24/3600  +25569.0    #converts to excel days
+    #print("Excel date input DD-MM-YY HH:MM must be column 1 of input csv file.")
+    #print("Ensure day is first, not month.")
+    #print("Each other column is the water level in a well at the time specified in column 1.")
+    
+    ###deal with excel date input (EXCEL DATE INPUT IS ASSUMED)
+    ###convert to numeric days
 
 
-	#check if atmosphere 
-	atminput = input('INPUT: Is atm data (converted to water height 1HPa = 0.01m (m)) included as last column of csv y/n?')
-	if atminput == 'y':
-		atmospheric_wlevel = data.values[:,-1]
-		data = data.drop(labels = list(data)[-1],axis=1)
-
-	t = data.values[:,0]*24 # put into hourly time (excel format is in days)
-
-	
+    col_1_name = list(data)[0]
+    data[col_1_name] = pd.to_datetime(data[col_1_name],dayfirst=True)
+    data[col_1_name] = pd.to_numeric(data[col_1_name])/1e9/24/3600  +25569.0    #converts to excel days
 
 
-	#Main program is below:
-	for i in range(1,len(list(data))):
-		vals=data.values[:,i]
-		vals=vals-vals[0]
-		
-		#DFT to keep roughly the specified 12hr, 24hr tidal bands only
-		v2 = fft_keeptidalbands(t,vals,bands = [[0.03,0.06],[0.07,0.1]])
-		t2 = t[::]
-		
-		#aim for the middle section of test data
-		v2=v2[int(0*len(t)):int(1*len(t))]
-		t2=t2[int(0*len(t)):int(1*len(t))]
-	
-		#Pull out specific tidal frequencies using scipy optimise
-		func7,popt7 = optimise_tides7freq(t2,v2)
-		smoothed_vals = vals-func7(t,*popt7)
-	
-		#ensure non negative and zero at t=0
-		#smoothed_vals[smoothed_vals<0]=0
-		#smoothed_vals[0]=0
-		
-		#plot - for information only
-		plt.plot(t,vals,'r')
-		plt.plot(t,smoothed_vals,'k')
-		plt.plot(t,func7(t,*popt7),'g')
-		plt.title(list(data)[i])
-		plt.xlabel('Time (hr)')
-		plt.ylabel('Water level (m)')
-		plt.ylim((-0.2,1.6))
-		plt.grid(True)
+    #check if atmosphere 
+    atminput = input('INPUT: Is atm data (converted to water height 1HPa = 0.01m (m)) included as last column of csv y/n?')
+    if atminput == 'y':
+        atmospheric_wlevel = data.values[:,-1]
+        data = data.drop(labels = list(data)[-1],axis=1)
 
-		if atminput == 'y':
-			plt.plot(t,atmospheric_wlevel,'b', linewidth=0.2)
-
-		plt.show()
+    t = data.values[:,0]*24 # put into hourly time (excel format is in days)
 
 
-		#replace in datafram
-		data[list(data)[i]]=smoothed_vals
 
-	#save to csv
-	data.to_csv(filename[0:-4]+'smoothed.csv',index=False)
-	
-	return
+
+    #Main program is below:
+    for i in range(1,len(list(data))):
+        vals=data.values[:,i]
+        vals=vals-vals[0]
+        
+        #DFT to keep roughly the specified 12hr, 24hr tidal bands only
+        v2 = fft_keeptidalbands(t,vals,bands = [[0.03,0.06],[0.07,0.1]])
+        t2 = t[::]
+        
+        #aim for the middle section of test data
+        v2=v2[int(0*len(t)):int(1*len(t))]
+        t2=t2[int(0*len(t)):int(1*len(t))]
+
+        #Pull out specific tidal frequencies using scipy optimise
+        func7,popt7 = optimise_tides7freq(t2,v2)
+        smoothed_vals = vals-func7(t,*popt7)
+
+        #ensure non negative and zero at t=0
+        #smoothed_vals[smoothed_vals<0]=0
+        #smoothed_vals[0]=0
+        
+        #plot - for information only
+        pltnonsmth = plt.plot(t,vals,'r',label = 'Raw data')
+        pltsmth = plt.plot(t,smoothed_vals,'k', label = 'Smoothed data')
+        plttide = plt.plot(t,func7(t,*popt7),'g',label = 'Extracted tide')
+        plt.title(list(data)[i])
+        plt.xlabel('Time (hr)')
+        plt.ylabel('Water level (m)')
+        #plt.ylim((-0.2,1.6))
+        plt.grid(True)
+        plt.legend()
+        if atminput == 'y':
+            plt.plot(t,atmospheric_wlevel,'b', linewidth=0.2)
+        
+        mngr = plt.get_current_fig_manager()
+        mngr.window.wm_geometry(newGeometry='725x450+50+50')
+        plt.show()
+
+
+        #replace in datafram
+        data[list(data)[i]]=smoothed_vals
+
+    #save to csv
+    data.to_csv(filename[0:-4]+'smoothed.csv',index=False)
+
+    return
 	
 	
 	
 	
 if __name__ == "__main__":
 
+    from tkinter import filedialog
+    from tkinter import *
+    from pathlib import Path
     
-	rtests = pd.read_csv('Dummy.csv')
-	rtests['Time']=pd.to_datetime(rtests['Time'],dayfirst=True)
-	rtests['Time']=pd.to_numeric(rtests['Time'])/1e9/3600
-	names = list(rtests)
-	t = rtests['Time'].values
-
-	wellnnumber = input("Input well number (1,2,3 ..):")
-	vals = rtests[names[int(wellnnumber)]].values
-	
-	#t2=t[50::]
-	#v2=vals[50::]
-	#v2=sig.detrend(v2)
-	
-	v2 = fft_keeptidalbands(t,vals)
-	t2=t[::]
-	
-	#plt.plot(t,v2)
-	#plt.show()
-	
-	v2=v2[20:int(0.8*len(t))]
-	t2=t2[20:int(0.8*len(t))]
-	
-	#func3,popt3 = optimise_tides3freq(t2,v2)
-	#plt.plot(t,vals-func3(t,*popt3),'r')
-	func5,popt5 = optimise_tides5freq(t2,v2)
-	plt.plot(t,vals-func5(t,*popt5),'g')
-	plt.plot(t,vals,'b',linewidth=0.3)
-	plt.show()
+    print("Input csv file requirements:")
+    print("Excel date format DD-MM-YY HH:MM must be column 1 of input csv file.")
+    print("Ensure day is first, not month.")
+    print("Each other column is the water level in a well at the time specified in column 1.")
+    a1 = input("Press any key to contiue.")
+    
+    #User input file location data
+    root = Tk()
+    myfilename = filedialog.askopenfilename(title = "select well water level data file",filetypes = (("csv files","*.csv"),))
+    root.destroy()
+    
+    smooth_MM_tide(myfilename)
+    print("Smoothed data saved to same location as raw data.")
+    a1 = input("Press any key to close.")
+    
+    
+    
+    
+    

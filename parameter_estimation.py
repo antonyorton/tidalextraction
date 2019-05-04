@@ -6,10 +6,13 @@ from scipy.special import exp1
 import scipy.optimize as opt
 import time
 import os
+from tkinter import *
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename
 
 
 def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
-    dist_matrix = 'distances.csv', imagewell_dist_matrix = 'imagewell_distances.csv', \
+    coordsfile = 'coordinates.csv', imwell_coordsfile = 'imagewell_coordinates.csv', \
     include_image_well=False,fit_leaky = True,points_for_fit = 50,plot_results = True, results_to_csv = False):
     
     """Curve fitting of groundwater pumping test data to both the Theis W(u) function and the Walton W(u,R/L) function
@@ -39,9 +42,7 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
     
     """
    
-    
-    print("Time units (sec, min, hr or day) and distance units (m, cm and mm) are the responsibility of the user. Displayed results will be in those same units.")
-    print("The user is responsible for supplying consistent units")
+    print("No assumptions about units is made by the program. The user is responsible for supplying consistent units")
     
     starttest = start_stop[0]
     endtest = start_stop[1]
@@ -53,11 +54,11 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
     
     #crop data prior to test start time
     t=data.values[:,0]  
-    startindex = np.argmax(t>=starttest-0.05/24)
+    startindex = np.argmax(t>=starttest-0.5*(t[1]-t[0]))
     data=data.iloc[startindex::].copy()
     data.reset_index(inplace=True,drop=True)
     t=data.values[:,0]
-    endindex = np.argmax(t>=endtest-0.05/24)
+    endindex = np.argmax(t>=endtest-0.5*(t[1]-t[0]))
 
     ###################
       
@@ -77,25 +78,30 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
         ind1 = np.arange(len(t))
         
     fittedtheis = pd.DataFrame(t,columns=['Time']) #DF to store theis curves
-    
-    #radial distances
-    distance_matrix = pd.read_csv(dist_matrix,index_col=0)
-    if include_image_well==True:
-        imwell_distance_matrix = pd.read_csv(imagewell_dist_matrix,index_col=0)
+        
+    coords = pd.read_csv(coordsfile,index_col=0)
+    coordwell = coords.loc[wellname][['east','north']].values
+    coords['distance'] = np.sqrt((coords['east']-coordwell[0])**2+(coords['north']-coordwell[1])**2)
 
+    if include_image_well:
+        img_coords = pd.read_csv(imwell_coordsfile,index_col=0)
+        coordwell = img_coords.loc[wellname][['east','north']].values
+        coords['img_distance'] = np.sqrt((coords['east']-coordwell[0])**2+(coords['north']-coordwell[1])**2)
 
     #Optimise standard Theis
     allvals = data.values[:,1::][ind1]
     list1 = []
 
+    
+    
     for i in range(allvals.shape[-1]):
 
         #######################
         #optimisable function for standard Theis for T
         #function to be optimised (for T)
-        R = distance_matrix.loc[list(data)[i+1]][wellname]
+        R = coords.loc[list(data)[i+1]]['distance']
         if include_image_well:
-            Rimage = imwell_distance_matrix.loc[list(data)[i+1]][wellname]
+            Rimage = coords.loc[list(data)[i+1]]['img_distance']
         else:
             Rimage = 0
             
@@ -147,9 +153,9 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
 
             
             #get R#############
-            R = distance_matrix.loc[list(data)[i+1]][wellname]
+            R = coords.loc[list(data)[i+1]]['distance']
             if include_image_well:
-                Rimage = imwell_distance_matrix.loc[list(data)[i+1]][wellname]
+                Rimage = coords.loc[list(data)[i+1]]['img_distance']
             else:
                 Rimage = 0
             ####################
@@ -190,9 +196,11 @@ def fit_params(filename,wellname,flow_rate = 1, start_stop = [0,100], \
             plt.plot(tfull[ind1],allvals[:,i][ind1],'ob',fillstyle='none')
             plt.xlabel('Time (in same units as input file)')
             plt.ylabel('Response (in same units as input file)')
-            plt.title(wellname+' Recharge - obs well: '+resulttheis.iloc[i]['name']+'  T = '+str(resultleak.iloc[i]['T']))
+            plt.title('Test well: '+wellname+', Obs well: '+resulttheis.iloc[i]['name']+', T = '+str(resultleak.iloc[i]['T'])[0:7]+', R = '+str(resultleak.iloc[i]['R_dist'])[0:6])
             plt.legend(loc='lower right')
             plt.grid(True)
+            mngr = plt.get_current_fig_manager()
+            mngr.window.wm_geometry(newGeometry='725x450+50+50')
             plt.show()   
         
     if results_to_csv:   
@@ -260,35 +268,61 @@ def reduced_indicies(N,max_n=50,stop_pumping_index=100):
     
 if __name__ == "__main__":
     
-    #import os
-    #dir1 = os.getcwd()
-    #os.chdir('\\ABTFFS01.corp.coffey.com.au\\Data$\\GEOT\\PROJ\GEOTABTF\200000TT\754-MELGE200000 - Melbourne Metro\DATA\Groundwater\Recharge Tests\Detailed assessment\Arden\data')
-    
-    print('0. d1')
-    print('1. d2')
-    print('2. d3')
-    print('3. d4')
-	print('4. d5')
-	print('5. d6')
-    numwell=int(input('Choose well number (0,1,2,3,4,5):'))
-    wnames = ['a','b','c','d','e','f']
-    imwell = [False,False,False,False,False,False]
-    myflow_rate=[1,1,1,1,1,2,]
-    #test start and finish times in order of wells as specified in wnames
-    startstop=[[43311.60,43319.69],[43327.63,43330.73],[43347.42,43356.71],[43335.42,43343.69],[43360.56,43370.65],[43374.54,43377.67]]
 
-    #Well name
-    mywellname=wnames[numwell]
-    myfilename = wnames[numwell]+'.csv'
-    include_image_well=imwell[numwell]
-    start11 = startstop[numwell][0]
-    end11 = startstop[numwell][1]
+    from tkinter import filedialog
+    from tkinter import *
+    from pathlib import Path
+
+    print(" ")
+    print(".... ")
+    print("AQUIFER PARAMETER CURVE FITTING PROGRAM")
+    print("Time units (sec, min, hr or day) and distance units (m, cm and mm) are the responsibility of the user. Displayed results will be in those same units.")
+    print("This includes flow rates, start and stop times, coordinates and distances.")
+    print("Be a good engineer and use consistent units.")
+    print(".... ")
+    print(" ")
+    print("The following data files must exist with names as shown:")
+    print(" ")
+    print("1. testdetails.csv:  columns - 'testwell' (ie pumping well name), 'Q' (flow rate), 'start' (time of pumping start), 'stop' (time of pumping stop), 'include_image' (True/False, whether to include image wells) ")
+    print("2. wellcoordinates.csv:  columns - 'name', 'east', 'north'  (the coordinates of all obs. wells and pumping wells)")
+    print("3. imagewellcoordinates.csv:  (optional) As for wellcordinates.csv, except provides the coordinates of the image wells only (one per pumping well allowed, name should be the same as the relevant pumping well)")
+    print(" ")
+    print("The user is asked to select a well responses file which must have the format: column 1. label (row1) = Time, data = time, columns 2,3,4,... labels = obs well names, data = water level in each of the obs wells for time specified in column 1")
+    print(" ")
     
-    myQ = myflow_rate[numwell]/1000*86400  #Flow rate in m3/day to be consistent with time input column of groundwater response data
+    #User input file location data
+    mywellname = input('To continue, please input pumping/recharge well name:')
+    root = Tk()
+    filedatadirectory = Path(filedialog.askdirectory(title = "Select data directory where csv files are located"))
+    myfilename = filedialog.askopenfilename(title = "select well responses data file",filetypes = (("csv files","*.csv"),))
+    root.destroy()
     
-    resulttheis,fittedtheis,resultleak,fitleak = fit_params(myfilename, mywellname,points_for_fit=50,flow_rate = myQ, start_stop = [start11,end11],\
-    include_image_well=include_image_well,fit_leaky=True)
+    dir1 = os.getcwd()
+    os.chdir(filedatadirectory)
     
-    #os.chdir(dir1)
+    #Extract parameters
+    testdetails = filedatadirectory / 'testdetails.csv'
+    testdetails = pd.read_csv(testdetails,index_col=0)
+    include_image_well = testdetails.loc[mywellname]['include_image']
+    mycoordsfile = filedatadirectory / 'wellcoordinates.csv'
+    if include_image_well:
+        myimagecoordsfile = os.path.join(filedatadirectory,'wellcoordinates.csv')
+    else:
+        myimagecoordsfile = ''
     
+    #Get data from testdetails.csv file
+    start11 = testdetails.loc[mywellname]['start']
+    end11 = testdetails.loc[mywellname]['stop']
+    myflow_rate = testdetails.loc[mywellname]['Q']
+
+    
+    num_points = int(input("Input desired number of points to use for fitting (reduce number of points to speed up):"))
+ 
+    resulttheis,fittedtheis,resultleak,fitleak = fit_params(myfilename, mywellname,points_for_fit=num_points,flow_rate = myflow_rate, start_stop = [start11,end11],\
+    coordsfile = mycoordsfile, imwell_coordsfile = myimagecoordsfile, \
+    include_image_well=include_image_well,fit_leaky=True,results_to_csv = True)
+
+    print('Parameters and fitted curves saved to folder where data files are located.')
+    os.chdir(dir1)
+    a1 = input("press any key to close.")
     
